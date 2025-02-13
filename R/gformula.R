@@ -757,7 +757,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
                               int_times = NULL, int_descript = NULL, ref_int = 0, intcomp = NA,
                               visitprocess = NA, restrictions = NA,
                               yrestrictions = NA, compevent_restrictions = NA,
-                              cond_vars = NULL,
+#                              emmnames = NULL, emmtypes = NULL, emmparams = NULL,
                               baselags = FALSE,
                               nsimul = NA, sim_data_b = FALSE, seed,
                               nsamples = 0, parallel = FALSE, ncores = NA,
@@ -774,6 +774,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
 
   comprisk <- !(length(compevent_model) == 1 && is.na(compevent_model))
   censor <- !(length(censor_model) == 1 && is.na(censor_model))
+#  emm <- !(is.null(emmnames) && is.null(emmtypes) && is.null(emmparams)) # add effect measure modifier checking
 
   if (!missing(ymodel)){
     lag_indicator <- update_lag_indicator(ymodel, lag_indicator)
@@ -1115,10 +1116,12 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
                sim_trunc = sim_trunc, ...)
     })
   }
-
-  nat_pool <- pools[[1]] # Natural course data
-  pools <- pools[-1] # List of intervention datasets
-
+  return(pools)
+#  nat_pool <- pools[[1]] # Natural course data
+#  pools <- pools[-1] # List of intervention datasets
+#  return(list(nat_pool,pools))
+}
+deactivated_part_of_gformula <- function(){if(FALSE){
   # Initialize results matrices
   result_ratio <- result_diff <- int_result <-
     matrix(NA, nrow = length(pools) + 1, ncol = time_points)
@@ -1489,7 +1492,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
   )
   class(res) <- c("gformula_survival", "gformula")
   return (res)
-}
+}}
 
 #' Estimation of Continuous End-of-Follow-Up Outcome Under the Parametric G-Formula
 #'
