@@ -140,6 +140,8 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
                      yrestrictions, compevent_restrictions, restrictions,
                      outcome_name, compevent_name, time_name,
                      intvars, interventions, int_times, histvars, histvals, histories,
+                     lag_indicators_new  , lag_cumavg_indicators_new , cumavg_indicators_new  ,
+                     extra_lag_variables,
                      comprisk, ranges,
                      outcome_type, subseed, obs_data, time_points, parallel,
                      covnames, covtypes, covparams, covpredict_custom,
@@ -148,8 +150,16 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
                      ...){
   set.seed(subseed)
 
+  #rwl add in new variable lag_indicators_new for holding new version of lag_indicator list. This is not included in histvals
+
   # Mechanism of passing intervention variable and intervention is different for parallel
   # and non-parallel versions
+
+#  print(colnames(obs_data))
+
+#  print(extra_lag_variables)
+
+
   if (parallel){
     intvar <- intvars[[o]]
     intervention <- interventions[[o]]
@@ -191,22 +201,32 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
     histories_int <- histories_int[!is.na(histories_int)]
   }
 
+
+
   for (t in ((1:time_points) - 1)){
     if (t == 0){
       # Set simulated covariate values at time t = 0 equal to observed covariate values
+      # rwl added in the list of potential lagged values contained in extra_lag_variables
+      # these variables would have been created in the modeling stage.
+
       if (!is.na(basecovs[[1]])){
-        pool <- obs_data[obs_data[[time_name]] <= t, ][, .SD, .SDcols = c(covnames, basecovs, time_name)]
+        pool <- obs_data[obs_data[[time_name]] <= t, ][, .SD, .SDcols = c(covnames, basecovs, time_name, extra_lag_variables)]
       } else {
-        pool <- obs_data[obs_data[[time_name]] <= t, ][, .SD, .SDcols = c(covnames, time_name)]
+        pool <- obs_data[obs_data[[time_name]] <= t, ][, .SD, .SDcols = c(covnames, time_name, extra_lag_variables)]
       }
       set(pool, j = 'id', value = rep(ids_unique, each = 1 - min_time))
       set(pool, j = 'eligible_pt', value = TRUE)
       if (!is.na(basecovs[[1]])){
-        setcolorder(pool, c('id', time_name, covnames, basecovs))
+        setcolorder(pool, c('id', time_name, covnames, extra_lag_variables , basecovs))
       } else {
-        setcolorder(pool, c('id', time_name, covnames))
+        setcolorder(pool, c('id', time_name, covnames , extra_lag_variables))
       }
       newdf <- pool[pool[[time_name]] == 0]
+
+
+  #RWL    print(nat_course)
+  #    print(head(newdf))
+  #    return(1)
       # Update datatable with specified treatment regime / intervention for this
       # simulation
       if (!nat_course){
@@ -219,6 +239,7 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
           }
         }
       }
+
       intfunc(newdf, pool = pool, intervention, intvar, unlist(int_time), time_name, t)
       # Check if intervened
       intervened <- rep(0, times = nrow(newdf))
@@ -239,10 +260,21 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
       }
       # Update datatable with new covariates that are functions of history of existing
       # covariates
-      make_histories(pool = pool, histvars = histvars, histvals = histvals,
-                     histories = histories, time_name = time_name, t = t, id = 'id',
-                     max_visits = max_visits, baselags = baselags, below_zero_indicator = below_zero_indicator)
-      newdf <- pool[pool[[time_name]] == t]
+
+      # rwl this call is a waste of time if we already had the histories at baseline from the modeling stage
+      # after any intervention this would only affect the variables like cumavg that use the current value.
+      # NO previous/lagged values would change
+      # for testig program there are no variables of cumavg type.
+      # RWL WILL COMMENT OUT THE FOLLOWING FEW LINES
+
+#      make_histories(pool = pool, histvars = histvars, histvals = histvals,
+#                     histories = histories, time_name = time_name, t = t, id = 'id',
+#                     max_visits = max_visits, baselags = baselags, below_zero_indicator = below_zero_indicator)
+#      newdf <- pool[pool[[time_name]] == t]
+##      print("newdf at time = 0 after make histories")
+##      print(histvals)
+##      print(head(newdf))
+##      return(1)
       # Generate outcome probabilities
       if (outcome_type == 'survival'){
         if (is.null(ymodel_predict_custom)){
@@ -319,21 +351,34 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
       pool <- rbind(pool[pool[[time_name]] < t], newdf, fill = TRUE)
       pool <- pool[order(id, get(time_name))]
       col_types <- sapply(pool, class)
+      #rwl END OF TIME = 0 CHUNK: NEED TO UPDATE(?) THE LAGGED VALUES
+
     } else {
       # Set initial simulated values at time t to simulated values at time t - 1, to be
       # updated later
-      newdf <- pool[pool[[time_name]] == t - 1]
+
+      #RWL NOW LOOP T > 0
+
+      #RWL CAN WE JUST USE THE NEWDF FROM THE PREVIOUS LOOP? WHY RELOAD IT AGAIN
+      #RWL HOW MUCH TIME DOES THIS TAKE?
+
+      ##newdf <- pool[pool[[time_name]] == t - 1]
       set(newdf, j = time_name, value = rep(t, data_len))
+
+
       if ('categorical time' %in% covtypes){
         time_name_f <- paste(time_name, "_f", sep = "")
         newdf[, (time_name_f) :=
                 obs_data[get(time_name) == t, get(time_name_f)][1]]
       }
       pool <- rbind(newdf, pool)
-      make_histories(pool = pool, histvars = histvars, histvals = histvals, histories = histories,
-                     time_name = time_name, t = t, id = 'id', max_visits = max_visits,
-                     baselags = baselags, below_zero_indicator = below_zero_indicator)
-      newdf <- pool[pool[[time_name]] == t]
+      # RWL the next call to make histories is not needed for generating lagged values
+
+#RWL      make_histories(pool = pool, histvars = histvars, histvals = histvals, histories = histories,
+#RWL                     time_name = time_name, t = t, id = 'id', max_visits = max_visits,
+#RWL                     baselags = baselags, below_zero_indicator = below_zero_indicator)
+#RWL      newdf <- pool[pool[[time_name]] == t]
+
       for (i in seq_along(covnames)){
         cast <- get(paste0('as.',unname(col_types[covnames[i]])))
         if (covtypes[i] == 'binary'){
@@ -505,21 +550,48 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
             }
           })
         }
+        #RWL at this point covariate[i] has been simulated.
+        #RWL there should not be a reason to update the lagged values since they do not change.
+        #RWL Only variables where the predictor depends on the current value would need to be updated
+        #RWL cumavg type variables, custom???
+
         pool[pool[[time_name]] == t] <- newdf
         if (covnames[i] %in% unlist(histvars)){
+
           ind <- unlist(lapply(histvars, FUN = function(x) {
             covnames[i] %in% x
             }))
-          make_histories(pool = pool, histvars = rep(list(covnames[i]), sum(ind)),
-                         histvals = histvals, histories = histories[ind],
-                         time_name = time_name, t = t, id = 'id', max_visits = max_visits,
-                         baselags = baselags, below_zero_indicator = below_zero_indicator)
-          newdf <- pool[pool[[time_name]] == t]
+#RWL this is not needed for just the lagged values.
+#RWL for testing will comment it out
+#RWL          make_histories(pool = pool, histvars = rep(list(covnames[i]), sum(ind)),
+#RWL                         histvals = histvals, histories = histories[ind],
+#RWL                         time_name = time_name, t = t, id = 'id', max_visits = max_visits,
+#RWL                         baselags = baselags, below_zero_indicator = below_zero_indicator)
+#RWL          newdf <- pool[pool[[time_name]] == t]
         }
+        #RWL for cumavg update
+
+
+          var.info <- cumavg_indicators_new[[i]]
+          var.in.name <- var.info$var.name
+          max.lag <- as.numeric(var.info$max.lag)
+          if( max.lag == 1){
+            ##print(c("there is a cumavg for ",covnames[i],var.in.name, max.lag, t))
+            lag.names <- paste0("cumavg_",var.in.name)
+            newdf[,(lag.names) := eval(parse(text=paste0("(t*cumavg_",var.in.name,"+",var.in.name,")/(t+1)")))]
+          }
+
+
+
       }
       # Update datatable with specified treatment regime / intervention for this
       # simulation
-      newdf <- pool[pool[[time_name]] == t]
+      #RWL newdf <- pool[pool[[time_name]] == t]
+
+
+
+
+
       if (!nat_course){
         mycols <- match(intvar, names(newdf))
         temp_intvar <- newdf[, ..mycols]
@@ -546,13 +618,17 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
       # covariates
       pool[pool[[time_name]] == t] <- newdf
 
-      if (!(length(intvar) == 1 && intvar == 'none') && length(histvars_int) > 0){
-        make_histories(pool = pool, histvars = histvars_int, histvals = histvals,
-                       histories = histories_int, time_name = time_name, t = t, id = 'id',
-                       max_visits = max_visits, baselags = baselags, below_zero_indicator = below_zero_indicator)
-      }
+#RWL for intervened variables only need to update any histories if they include current value.
+#RWL do not need to update lagged values
+#RWL for testing will comment out the following lines
 
-      newdf <- pool[pool[[time_name]] == t]
+#RWL      if (!(length(intvar) == 1 && intvar == 'none') && length(histvars_int) > 0){
+#RWL        make_histories(pool = pool, histvars = histvars_int, histvals = histvals,
+#RWL                       histories = histories_int, time_name = time_name, t = t, id = 'id',
+#RWL                       max_visits = max_visits, baselags = baselags, below_zero_indicator = below_zero_indicator)
+#RWL      }
+
+#RWL      newdf <- pool[pool[[time_name]] == t]
 
       # Predict outcome probabilities
       if (outcome_type == 'survival'){
@@ -627,9 +703,93 @@ simulate <- function(o, fitcov, fitY, fitD, ymodel_predict_custom,
         set(newdf, j = 'prodp0', value = (1 - newdf$Py) * pool[pool[[time_name]] == t - 1,]$prodp0)
         set(newdf, j = 'poprisk', value = pool[pool[[time_name]] == t - 1,]$poprisk + newdf$prodp1)
       }
-      pool[pool[[time_name]] == t] <- newdf
+#RWL      pool[pool[[time_name]] == t] <- newdf
+
+    } #RWL END OF GENERAL TIME CHUNK OF CODE
+    # INCLUDE NEW CODE FOR UPDATING LAGGED VALUES
+#RWL    if(nat_course) print(t)
+#RWL    if(nat_course) print(head(newdf[,c("time","systolic","lag1_systolic","ldl","lag1_ldl")]))
+
+#RWL We need to perform update of lag_cumavg variables first
+
+#RWL for updating lag_cumavgX_Y we can use: (THIS IS FOR THE t+1 observation)
+#RWL  lag_cumavg1_Y = {(t - 1) * lag_cumavg1_Y + Y(t)}/(t)
+#RWL  lag_cumavg2_Y = {(t - 2) * lag_cumavg2_Y + lag1_Y}/(t-1) IMPORTANT: THIS NEEDS TO BE DONE BEFORE UPDATING LAG1_Y
+#RWL  lag_cumavg3_Y = {(t - 3) * lag_cumavg3_Y + lag2_Y}/(t-2) THIS NEEDS TO BE DONE BEFORE UPDATING LAG2_Y
+#RWL  AFTER THE LAG_CUMAVGi VARIABLES HAVE BEEN UPDATED, THEN THE LAGi VARIABLES CAN BE UPDATED.
+
+# FOR CUMAVG_Y, AFTER y HAS BEEN UPDATED FROM SIMULATED VALUE CUMAVG_Y(t) = {(t-1)*cumavg_y(t-1) + y(t)}/t
+
+    lapply(seq_along(lag_cumavg_indicators_new),FUN = function(var.index){
+      var.info <- lag_cumavg_indicators_new[[var.index]]
+      var.in.name <- var.info$var.name
+      lag.values <- var.info$max.lag
+      max.lag <- max(as.numeric(lag.values ))
+      if(max.lag > 0){
+        max.lag2 <- max.lag - 1
+        lag.names <- sapply(lag.values , FUN=function(i){ paste0("lag_cumavg",i,"_",var.in.name)})
+        ## print(lag.names)
+
+        newdf[,(lag.names) := lapply(lag.values,FUN=function(i) {
+        #  print(c(t,i))
+        if( t < i - 1 ) {
+               0
+          }
+
+        else if (t == i - 1 ){
+             if(i == 1) {
+                eval(parse(text=paste0(var.in.name )))
+             }
+             else {
+                eval(parse(text=paste0("lag",i-1,"_",var.in.name)))
+             }
+        }
+        else {
+          if( i == 1){
+               eval(parse(text = paste0("(t*lag_cumavg",i,"_",var.in.name,"+",var.in.name,")/(t+1)")))
+          }
+          else {
+                eval(parse(text = paste0("((t+1-i) *lag_cumavg",i,"_",var.in.name,"+lag",i-1,"_",var.in.name,")/(t+1-(i-1) )")))
+              ##  print(paste0("((t+1-i*lag_cumavg",i,"_",var.in.name,"+lag",i-1,"_",var.in.name,")/(t-(i-1)+1)"))
+          }
+      }
+
+
+        })
+        ]
     }
-  }
+      })
+
+
+
+##newdf[,lag_cumavg1_ldl := NULL ]
+#RWL this is setting the lag_cumavg1_X for use in the next loop for time.
+#RWL this will be used for the t+1 loop.
+#RWL when t = 0 , at time = 1 lag_cumavg1_X will be equal to X
+#RWL when t = 1, at time = 2 , lag_cumavg1_X =
+
+
+
+    lapply(seq_along(lag_indicators_new),FUN=function(var.index){
+        var.info <- lag_indicators_new[[var.index]]
+        var.in.name <- var.info$var.name
+        max.lag <- as.numeric(var.info$max.lag)
+        if(max.lag > 0){
+          max.lag2 <- max.lag - 1
+          lag.names <- sapply(max.lag:1 , FUN=function(i){paste0("lag",i,"_",var.in.name)})
+          ##    print(lag.names)
+
+          newdf[,(lag.names) := lapply(max.lag2:0,FUN=function(x){
+            if(x==0){eval(parse(text=var.in.name))}
+            else {eval(parse(text=paste0("lag",x,"_",var.in.name)))}
+          })]
+        }
+      }
+    )
+#RWL    if(nat_course) print(head(newdf[,c("time","systolic","lag1_systolic","ldl","lag1_ldl")]))
+    pool[pool[[time_name]] == t] <- newdf
+
+  } # RWL END OF LOOP OVER TIME
   colnames(pool)[colnames(pool) == time_name] <- 't0'
   setorder(pool, id, t0)
   colnames(pool)[colnames(pool) == 't0'] <- time_name
