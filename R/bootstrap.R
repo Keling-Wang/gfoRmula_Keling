@@ -115,6 +115,7 @@
 #'
 #' @keywords internal
 #' @import data.table
+#' @export
 bootstrap_helper <- function(r, time_points, obs_data, bootseeds, outcome_type,
                              intvars, interventions, int_times, ref_int,
                              covparams, covnames, covtypes, covfits_custom, covpredict_custom, basecovs, histvars, histvals, histories,
@@ -200,7 +201,9 @@ bootstrap_helper <- function(r, time_points, obs_data, bootseeds, outcome_type,
              min_time = min_time, show_progress = show_progress, pb = pb,
              int_visit_type = int_visit_type[i], sim_trunc = sim_trunc, ...)
   })
-
+  return(pools)
+}
+if(FALSE){
   nat_pool <- pools[[1]] # Simulated data under natural course
   pools <- pools[-1]     # Simulated data under various interventions
 
@@ -329,8 +332,8 @@ bootstrap_helper <- function(r, time_points, obs_data, bootseeds, outcome_type,
 }
 
 
-
-
+#' Bootstrap Observed Data and Simulate Under All Interventions with trycatch
+#' @export
 bootstrap_helper_with_trycatch <- function(r, time_points, obs_data, bootseeds, outcome_type,
                              intvars, interventions, int_times, ref_int,
                              covparams, covnames, covtypes, covfits_custom, covpredict_custom, basecovs, histvars, histvals, histories,

@@ -1,5 +1,19 @@
 ## Package Updates
 
+### Private updates by Keling
+
+#### Changes in Version 1.1.0.2
+
+-   Export `bootstrap.R` with 2 functions for use.
+-   Truncate the implementation of simulation post-processing in `bootstrap.R`
+
+#### Changes in Version 1.1.0.1
+-   Truncate the implementation of simulation post-processing in `gformula_survival` and let it return a
+    raw simulated dataset.
+-   fix bugs (as in Version 1.1.1) of argument names in custom y model calling by `simulate.R`.
+
+
+
 ### Changes in Version 1.1.0 (2024-09-30)
 
 -   Added a new approach for specifying interventions in the
