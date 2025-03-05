@@ -201,8 +201,16 @@ bootstrap_helper <- function(r, time_points, obs_data, bootseeds, outcome_type,
              min_time = min_time, show_progress = show_progress, pb = pb,
              int_visit_type = int_visit_type[i], sim_trunc = sim_trunc, ...)
   })
-  return(pools)
+
+  # return meaningful part of the bootstrapped sample
+  colnames_to_return <- c("plco_id", covnames)
+  colnames_to_return <- c(colnames_to_return,paste0("lag1_",covnames))
+  colnames_to_return <- c(colnames_to_return,"Py","Y","D","prodp1","prodp0","poprisk","survival")
+
+  pools_resultcols <- lapply(pools, function(df) df[, ..colnames_to_return])
+  return(pools_resultcols)
 }
+
 if(FALSE){
   nat_pool <- pools[[1]] # Simulated data under natural course
   pools <- pools[-1]     # Simulated data under various interventions
@@ -333,7 +341,6 @@ if(FALSE){
 
 
 #' Bootstrap Observed Data and Simulate Under All Interventions with trycatch
-#' @export
 bootstrap_helper_with_trycatch <- function(r, time_points, obs_data, bootseeds, outcome_type,
                              intvars, interventions, int_times, ref_int,
                              covparams, covnames, covtypes, covfits_custom, covpredict_custom, basecovs, histvars, histvals, histories,

@@ -1068,6 +1068,8 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
     int_visit_type <- c(TRUE, int_visit_type)
   }
 
+  # we definitely need bootstrapping so this single run part can be safely deactivated.
+  if(FALSE){
   # Simulate pooled-over-time datasets containing covariates, outcome, and risk for each
   # subject
   if (parallel){
@@ -1120,8 +1122,10 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
 #  nat_pool <- pools[[1]] # Natural course data
 #  pools <- pools[-1] # List of intervention datasets
 #  return(list(nat_pool,pools))
-}
-deactivated_part_of_gformula <- function(){if(FALSE){
+ }
+
+  # These are post-processing parts for single run.
+  if(FALSE){
   # Initialize results matrices
   result_ratio <- result_diff <- int_result <-
     matrix(NA, nrow = length(pools) + 1, ncol = time_points)
@@ -1181,32 +1185,107 @@ deactivated_part_of_gformula <- function(){if(FALSE){
 
   # Calculate percent intervened
   percent_intervened_res <- get_percent_intervened(pools = pools)
+  }
 
   # Calculate user specified number of bootstrap risk ratios
+  #
+  boot_diag <- FALSE # deactivating postprocessing part of bootstrapping
+
+  simulate_bootstrap_parallel_call <- quote(
+    parallel::parLapply(cl, 1:nsamples, bootstrap_helper_with_trycatch, time_points = time_points,
+                        obs_data = obs_data_noresample, bootseeds = bootseeds,
+                        intvars = comb_intvars, interventions = comb_interventions, int_times = comb_int_times, ref_int = ref_int,
+                        covparams = covparams, covnames = covnames, covtypes = covtypes,
+                        covfits_custom = covfits_custom, covpredict_custom = covpredict_custom,
+                        basecovs = basecovs, ymodel = ymodel,
+                        ymodel_fit_custom = ymodel_fit_custom, ymodel_predict_custom = ymodel_predict_custom,
+                        histvars = histvars, histvals = histvals, histories = histories,
+                        comprisk = comprisk, compevent_model = compevent_model,
+                        yrestrictions = yrestrictions,
+                        compevent_restrictions = compevent_restrictions,
+                        restrictions = restrictions, outcome_type = outcome_type,
+                        ranges = ranges,
+                        time_name = time_name, outcome_name = outcome_name,
+                        compevent_name = compevent_name, parallel = parallel, ncores = ncores,
+                        max_visits = max_visits, hazardratio = hazardratio, intcomp = intcomp,
+                        boot_diag = boot_diag, nsimul = nsimul, baselags = baselags,
+                        below_zero_indicator = below_zero_indicator, min_time = min_time,
+                        show_progress = FALSE, int_visit_type = int_visit_type,
+                        sim_trunc = sim_trunc, ...)
+  )
+  simulate_bootstrap_nonparal_call <- quote(
+    lapply(1:nsamples, FUN = bootstrap_helper, time_points = time_points,
+           obs_data = obs_data_noresample, bootseeds = bootseeds,
+           intvars = comb_intvars, interventions = comb_interventions, int_times = comb_int_times, ref_int = ref_int,
+           covparams = covparams, covnames = covnames, covtypes = covtypes,
+           covfits_custom = covfits_custom, covpredict_custom = covpredict_custom,
+           basecovs = basecovs, ymodel = ymodel,
+           ymodel_fit_custom = ymodel_fit_custom, ymodel_predict_custom = ymodel_predict_custom,
+           histvars = histvars, histvals = histvals, histories = histories,
+           comprisk = comprisk, compevent_model = compevent_model,
+           yrestrictions = yrestrictions,
+           compevent_restrictions = compevent_restrictions,
+           restrictions = restrictions,
+           outcome_type = outcome_type,
+           ranges = ranges,
+           time_name = time_name, outcome_name = outcome_name,
+           compevent_name = compevent_name, parallel = parallel, ncores = ncores,
+           max_visits = max_visits, hazardratio = hazardratio, intcomp = intcomp,
+           boot_diag = boot_diag, nsimul = nsimul, baselags = baselags,
+           below_zero_indicator = below_zero_indicator, min_time = min_time,
+           show_progress = show_progress, pb = pb, int_visit_type = int_visit_type,
+           sim_trunc = sim_trunc, ...)
+  )
+  simulate_onego_parallel_call <- quote(
+    parallel::parLapply(cl, seq_along(comb_interventions), simulate,
+                        fitcov = fitcov, fitY = fitY, fitD = fitD,
+                        ymodel_predict_custom = ymodel_predict_custom,
+                        yrestrictions = yrestrictions,
+                        compevent_restrictions = compevent_restrictions,
+                        restrictions = restrictions,
+                        outcome_name = outcome_name, compevent_name = compevent_name,
+                        time_name = time_name,
+                        intvars = comb_intvars, interventions = comb_interventions,
+                        int_times = comb_int_times, histvars = histvars,
+                        histvals = histvals, histories = histories,
+                        covparams = covparams, covnames = covnames, covtypes = covtypes,
+                        covpredict_custom = covpredict_custom, basecovs = basecovs,
+                        comprisk = comprisk, ranges = ranges,
+                        outcome_type = outcome_type,
+                        subseed = subseed, time_points = time_points,
+                        obs_data = obs_data, parallel = parallel, max_visits = max_visits,
+                        baselags = baselags, below_zero_indicator = below_zero_indicator,
+                        min_time = min_time, show_progress = FALSE,
+                        int_visit_type = int_visit_type, sim_trunc = sim_trunc, ...)
+
+  )
+  simulate_call <- quote(
+    simulate(fitcov = fitcov, fitY = fitY, fitD = fitD,
+             ymodel_predict_custom = ymodel_predict_custom,
+             yrestrictions = yrestrictions,
+             compevent_restrictions = compevent_restrictions,
+             restrictions = restrictions,
+             outcome_name = outcome_name, compevent_name = compevent_name,
+             time_name = time_name,
+             intvars = comb_intvars[[i]], interventions = comb_interventions[[i]],
+             int_times = comb_int_times[[i]], histvars = histvars, histvals = histvals,
+             histories = histories, covparams = covparams,
+             covnames = covnames, covtypes = covtypes,
+             covpredict_custom = covpredict_custom, basecovs = basecovs, comprisk = comprisk,
+             ranges = ranges,
+             outcome_type = outcome_type,
+             subseed = subseed, time_points = time_points,
+             obs_data = obs_data, parallel = parallel, max_visits = max_visits,
+             baselags = baselags, below_zero_indicator = below_zero_indicator,
+             min_time = min_time, show_progress = FALSE, int_visit_type = int_visit_type[i],
+             sim_trunc = sim_trunc, ...)
+  )
+
   if (nsamples > 0){
     if (parallel){
       cl <- prep_cluster(ncores = ncores, threads = threads , covtypes = covtypes,
                          bootstrap_option = TRUE)
-      final_bs <- parallel::parLapply(cl, 1:nsamples, bootstrap_helper_with_trycatch, time_points = time_points,
-                                      obs_data = obs_data_noresample, bootseeds = bootseeds,
-                                      intvars = comb_intvars, interventions = comb_interventions, int_times = comb_int_times, ref_int = ref_int,
-                                      covparams = covparams, covnames = covnames, covtypes = covtypes,
-                                      covfits_custom = covfits_custom, covpredict_custom = covpredict_custom,
-                                      basecovs = basecovs, ymodel = ymodel,
-                                      ymodel_fit_custom = ymodel_fit_custom, ymodel_predict_custom = ymodel_predict_custom,
-                                      histvars = histvars, histvals = histvals, histories = histories,
-                                      comprisk = comprisk, compevent_model = compevent_model,
-                                      yrestrictions = yrestrictions,
-                                      compevent_restrictions = compevent_restrictions,
-                                      restrictions = restrictions, outcome_type = outcome_type,
-                                      ranges = ranges,
-                                      time_name = time_name, outcome_name = outcome_name,
-                                      compevent_name = compevent_name, parallel = parallel, ncores = ncores,
-                                      max_visits = max_visits, hazardratio = hazardratio, intcomp = intcomp,
-                                      boot_diag = boot_diag, nsimul = nsimul, baselags = baselags,
-                                      below_zero_indicator = below_zero_indicator, min_time = min_time,
-                                      show_progress = FALSE, int_visit_type = int_visit_type,
-                                      sim_trunc = sim_trunc, ...)
+      final_bs <- eval(simulate_bootstrap_parallel_call)
       parallel::stopCluster(cl)
     } else {
       if (show_progress){
@@ -1214,51 +1293,63 @@ deactivated_part_of_gformula <- function(){if(FALSE){
                                          clear = FALSE,
                                          format = 'Bootstrap progress [:bar] :percent, Elapsed time :elapsed, Est. time remaining :eta')
       }
-      final_bs <- lapply(1:nsamples, FUN = bootstrap_helper_with_trycatch, time_points = time_points,
-                         obs_data = obs_data_noresample, bootseeds = bootseeds,
-                         intvars = comb_intvars, interventions = comb_interventions, int_times = comb_int_times, ref_int = ref_int,
-                         covparams = covparams, covnames = covnames, covtypes = covtypes,
-                         covfits_custom = covfits_custom, covpredict_custom = covpredict_custom,
-                         basecovs = basecovs, ymodel = ymodel,
-                         ymodel_fit_custom = ymodel_fit_custom, ymodel_predict_custom = ymodel_predict_custom,
-                         histvars = histvars, histvals = histvals, histories = histories,
-                         comprisk = comprisk, compevent_model = compevent_model,
-                         yrestrictions = yrestrictions,
-                         compevent_restrictions = compevent_restrictions,
-                         restrictions = restrictions,
-                         outcome_type = outcome_type,
-                         ranges = ranges,
-                         time_name = time_name, outcome_name = outcome_name,
-                         compevent_name = compevent_name, parallel = parallel, ncores = ncores,
-                         max_visits = max_visits, hazardratio = hazardratio, intcomp = intcomp,
-                         boot_diag = boot_diag, nsimul = nsimul, baselags = baselags,
-                         below_zero_indicator = below_zero_indicator, min_time = min_time,
-                         show_progress = show_progress, pb = pb, int_visit_type = int_visit_type,
-                         sim_trunc = sim_trunc, ...)
+      final_bs <- eval(simulate_bootstrap_nonparal_call)
+    }
+    } else { # single run
+      if (parallel){
+        cl <- prep_cluster(ncores = ncores, threads = threads , covtypes = covtypes)
+        final_bs <- list(eval(simulate_onego_parallel_call))
+        parallel::stopCluster(cl)
+      } else {
+        final_bs <- list(
+          lapply(seq_along(comb_interventions), FUN = function(i){
+          simulate(fitcov = fitcov, fitY = fitY, fitD = fitD,
+                   ymodel_predict_custom = ymodel_predict_custom,
+                   yrestrictions = yrestrictions,
+                   compevent_restrictions = compevent_restrictions,
+                   restrictions = restrictions,
+                   outcome_name = outcome_name, compevent_name = compevent_name,
+                   time_name = time_name,
+                   intvars = comb_intvars[[i]], interventions = comb_interventions[[i]],
+                   int_times = comb_int_times[[i]], histvars = histvars, histvals = histvals,
+                   histories = histories, covparams = covparams,
+                   covnames = covnames, covtypes = covtypes,
+                   covpredict_custom = covpredict_custom, basecovs = basecovs, comprisk = comprisk,
+                   ranges = ranges,
+                   outcome_type = outcome_type,
+                   subseed = subseed, time_points = time_points,
+                   obs_data = obs_data, parallel = parallel, max_visits = max_visits,
+                   baselags = baselags, below_zero_indicator = below_zero_indicator,
+                   min_time = min_time, show_progress = FALSE, int_visit_type = int_visit_type[i],
+                   sim_trunc = sim_trunc, ...)
+        })
+        )
+      }
     }
 
-    comb_result <- rbindlist(lapply(final_bs, FUN = function(m){
+  if(FALSE){
+  comb_result <- rbindlist(lapply(final_bs, FUN = function(m){
       as.data.table(t(m$Result))
     }))
-    comb_RR <- rbindlist(lapply(final_bs, FUN = function(m){
+  comb_RR <- rbindlist(lapply(final_bs, FUN = function(m){
       as.data.table(t(m$ResultRatio))
     }))
-    comb_RD <- rbindlist(lapply(final_bs, FUN = function(m){
+  comb_RD <- rbindlist(lapply(final_bs, FUN = function(m){
       as.data.table(t(m$ResultDiff))
     }))
-    comb_HR <- rbindlist(lapply(final_bs, FUN = function(m){
+  comb_HR <- rbindlist(lapply(final_bs, FUN = function(m){
       as.data.table(m$ResultHR)
     }))
 
-    comb_result$t0 <- comb_RR$t0 <- comb_RD$t0 <-
-      rep(0:(time_points - 1), nsamples)
+  comb_result$t0 <- comb_RR$t0 <- comb_RD$t0 <-
+    rep(0:(time_points - 1), nsamples)
 
-    se_result <- comb_result[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
-    se_RR <- comb_RR[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
-    se_RD <- comb_RD[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
-    if (hazardratio){
-      hr_res[2] <- stats::sd(comb_HR$V1, na.rm = TRUE)
-    }
+  se_result <- comb_result[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
+  se_RR <- comb_RR[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
+  se_RD <- comb_RD[, lapply(.SD, stats::sd, na.rm = TRUE), by = t0]
+  if (hazardratio){
+    hr_res[2] <- stats::sd(comb_HR$V1, na.rm = TRUE)
+  }
 
     if (ci_method == 'normal'){
       ci_lb_result <- t(int_result) - stats::qnorm(0.975)*se_result[,-c('t0')]
@@ -1286,48 +1377,53 @@ deactivated_part_of_gformula <- function(){if(FALSE){
     if (hazardratio){
       names(hr_res)[2:4] <- c('HR SE', 'HR lower 95% CI', 'HR upper 95% CI')
     }
-  }
-  if (nsamples > 0 & boot_diag){
-    bootests <- comb_result
-    if (!is.null(int_descript)){
-      colnames(bootests)[1:(1 + length(interventions))] <- c('Natural course', int_descript)
+  } # silent
+  if(FALSE){
+    if (nsamples > 0 & boot_diag){
+      stop("Deactivated part of the code")
+      bootests <- comb_result
+      if (!is.null(int_descript)){
+        colnames(bootests)[1:(1 + length(interventions))] <- c('Natural course', int_descript)
+      } else {
+        colnames(bootests)[1:length(comb_interventions)] <- c('Natural course', paste('Intervention', 1:length(interventions)))
+      }
+      bootests[, 'Bootstrap replicate'] <- rep(1:nsamples, each = time_points)
+      bootcoeffs <- lapply(final_bs, "[[", 'bootcoeffs')
+      bootstderrs <- lapply(final_bs, "[[", 'bootstderrs')
+      bootvcovs <- lapply(final_bs, "[[", 'bootvcovs')
     } else {
-      colnames(bootests)[1:length(comb_interventions)] <- c('Natural course', paste('Intervention', 1:length(interventions)))
+      bootests <- NULL
+      bootcoeffs <- NULL
+      bootstderrs <- NULL
+      bootvcovs <- NULL
     }
-    bootests[, 'Bootstrap replicate'] <- rep(1:nsamples, each = time_points)
-    bootcoeffs <- lapply(final_bs, "[[", 'bootcoeffs')
-    bootstderrs <- lapply(final_bs, "[[", 'bootstderrs')
-    bootvcovs <- lapply(final_bs, "[[", 'bootvcovs')
-  } else {
-    bootests <- NULL
-    bootcoeffs <- NULL
-    bootstderrs <- NULL
-    bootvcovs <- NULL
-  }
+    plot_info <- get_plot_info(outcome_name = outcome_name,
+                               compevent_name = compevent_name,
+                               compevent2_name = compevent2_name,
+                               censor_name = censor_name,
+                               time_name = time_name,
+                               id = id,
+                               time_points = time_points,
+                               covnames = covnames,
+                               covtypes = covtypes,
+                               nat_pool = nat_pool,
+                               nat_result = nat_result,
+                               comprisk = comprisk,
+                               comprisk2 = comprisk2,
+                               censor = censor,
+                               fitD2 = fitD2,
+                               fitC = fitC,
+                               outcome_type = outcome_type,
+                               obs_data = obs_data_noresample,
+                               ipw_cutoff_quantile = ipw_cutoff_quantile,
+                               ipw_cutoff_value = ipw_cutoff_value)
+    obs_results <- plot_info$obs_results
 
-  plot_info <- get_plot_info(outcome_name = outcome_name,
-                             compevent_name = compevent_name,
-                             compevent2_name = compevent2_name,
-                             censor_name = censor_name,
-                             time_name = time_name,
-                             id = id,
-                             time_points = time_points,
-                             covnames = covnames,
-                             covtypes = covtypes,
-                             nat_pool = nat_pool,
-                             nat_result = nat_result,
-                             comprisk = comprisk,
-                             comprisk2 = comprisk2,
-                             censor = censor,
-                             fitD2 = fitD2,
-                             fitC = fitC,
-                             outcome_type = outcome_type,
-                             obs_data = obs_data_noresample,
-                             ipw_cutoff_quantile = ipw_cutoff_quantile,
-                             ipw_cutoff_value = ipw_cutoff_value)
-  obs_results <- plot_info$obs_results
+  } # not using this part anymore.
 
-  # Generate results table
+
+  # Generate results table, silent
+  if(FALSE){
   if (!is.null(interventions)){
     resultdf <- lapply(1:time_points, function(i){
       if (nsamples > 0){
@@ -1491,8 +1587,9 @@ deactivated_part_of_gformula <- function(){if(FALSE){
     header = header
   )
   class(res) <- c("gformula_survival", "gformula")
-  return (res)
-}}
+  }
+  return (final_bs)
+}
 
 #' Estimation of Continuous End-of-Follow-Up Outcome Under the Parametric G-Formula
 #'

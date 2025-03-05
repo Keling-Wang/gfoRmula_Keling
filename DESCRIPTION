@@ -1,6 +1,6 @@
 Package: gfoRmulaKelingvar
 Title: Parametric G-Formula modified by Keling
-Version: 1.1.1.2
+Version: 1.1.1.3
 Authors@R: c(person("Victoria", "Lin", role = c("aut"), 
                      email = "vlin@alumni.harvard.edu", 
                      comment = "V. Lin and S. McGrath made equal 
