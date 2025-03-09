@@ -761,7 +761,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
                               baselags = FALSE,
                               nsimul = NA, sim_data_b = FALSE, seed,
                               nsamples = 0, parallel = FALSE, ncores = NA,
-                              ci_method = 'percentile', threads,
+                              ci_method = 'percentile', threads, bootseeds = NA,
                               model_fits = FALSE, boot_diag = FALSE,
                               show_progress = TRUE, ipw_cutoff_quantile = NULL,
                               ipw_cutoff_value = NULL, int_visit_type = NULL,
@@ -968,12 +968,20 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
 
   # Generate seeds for simulations and bootstrapping
   set.seed(seed)
-  newseeds <- sample.int(2^30, size = nsamples + 2)
-  subseed <- newseeds[1]
-  subseed_forresampling <- newseeds[2]
-  if (nsamples > 0){
-    bootseeds <- newseeds[3:(nsamples + 2)]
+  if(is.na(bootseeds)){
+    newseeds <- sample.int(2^30, size = nsamples + 2)
+    subseed <- newseeds[1]
+    subseed_forresampling <- newseeds[2]
+    if (nsamples > 0){
+      bootseeds <- newseeds[3:(nsamples + 2)]
+    }
+  } else {
+    stopifnot(length(bootseeds)>=nsamples)
+    bootseeds <- bootseeds[1:nsamples]
+    subseed <- sample.int(2^30, size = 1)
+    subseed_forresampling <- sample.int(2^30, size = 1)
   }
+
 
 
   # Determine ranges of observed covariates and outcome
