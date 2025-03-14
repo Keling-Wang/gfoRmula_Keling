@@ -208,6 +208,7 @@ bootstrap_helper <- function(r, time_points, obs_data, bootseeds, outcome_type,
   colnames_to_return <- c(colnames_to_return,"Py","Y","D","prodp1","prodp0","poprisk","survival")
 
   pools_resultcols <- lapply(pools, function(df) df[, ..colnames_to_return])
+  gc()
   return(pools_resultcols)
 }
 

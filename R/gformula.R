@@ -761,7 +761,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
                               baselags = FALSE,
                               nsimul = NA, sim_data_b = FALSE, seed,
                               nsamples = 0, parallel = FALSE, ncores = NA,
-                              ci_method = 'percentile', threads, bootseeds = NA,
+                              ci_method = 'percentile', threads, bootseeds = NULL,
                               model_fits = FALSE, boot_diag = FALSE,
                               show_progress = TRUE, ipw_cutoff_quantile = NULL,
                               ipw_cutoff_value = NULL, int_visit_type = NULL,
@@ -968,7 +968,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
 
   # Generate seeds for simulations and bootstrapping
   set.seed(seed)
-  if(is.na(bootseeds)){
+  if(is.null(bootseeds)){
     newseeds <- sample.int(2^30, size = nsamples + 2)
     subseed <- newseeds[1]
     subseed_forresampling <- newseeds[2]
@@ -997,6 +997,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
   })
 
   # Fit models to covariates and outcome variable
+  if(FALSE){
   if (time_points > 1){
     fitcov <- pred_fun_cov(covparams = covparams, covnames = covnames, covtypes = covtypes,
                            covfits_custom = covfits_custom, restrictions = restrictions,
@@ -1026,6 +1027,7 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
     fitC <- pred_fun_D(censor_model, NA, obs_data_geq_0, model_fits = model_fits)
   } else {
     fitC <- NA
+  }
   }
 
 
@@ -1304,6 +1306,40 @@ gformula_survival <- function(obs_data, id, time_points = NULL,
       final_bs <- eval(simulate_bootstrap_nonparal_call)
     }
     } else { # single run
+
+      if (time_points > 1){
+        fitcov <- pred_fun_cov(covparams = covparams, covnames = covnames, covtypes = covtypes,
+                               covfits_custom = covfits_custom, restrictions = restrictions,
+                               time_name = time_name, obs_data = obs_data_geq_0,
+                               model_fits = model_fits)
+        names(fitcov) <- covnames
+      } else {
+        fitcov <- NULL
+      }
+      fitY <- pred_fun_Y(ymodel, yrestrictions, outcome_type, outcome_name, time_name, obs_data_geq_0,
+                         model_fits = model_fits, ymodel_fit_custom = ymodel_fit_custom)
+
+      # If competing event exists, fit model for competing event variable
+      if (comprisk){
+        fitD <- pred_fun_D(compevent_model, compevent_restrictions, obs_data_geq_0,
+                           model_fits = model_fits)
+      } else {
+        fitD <- NA
+      }
+      if (comprisk2){
+        fitD2 <- pred_fun_D(compevent2_model, NA, obs_data_geq_0,
+                            model_fits = model_fits)
+      } else {
+        fitD2 <- NA
+      }
+      if (censor){
+        fitC <- pred_fun_D(censor_model, NA, obs_data_geq_0, model_fits = model_fits)
+      } else {
+        fitC <- NA
+      }
+
+
+
       if (parallel){
         cl <- prep_cluster(ncores = ncores, threads = threads , covtypes = covtypes)
         final_bs <- list(eval(simulate_onego_parallel_call))
